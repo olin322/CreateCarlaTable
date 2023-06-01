@@ -12,12 +12,13 @@ from datetime import datetime
 ###
 RELATIVE_PATH = "./output_data/"
 ABSOLUTE_PATH = "/home/carla/CarlaTable/rawData/"
+DEBUG_LOG_PATH = "/home/carla/CarlaTable/log/"
 DELTA_V_CAP = 1e-5
-DELTA_T = 0.02
-
-HEADER = ["velocity_x, velocity_y, velocity_z", "location_x, location_y, location_z", \
-         "pitch, yaw, roll", "acceleration_x, acceleration_y, acceleration_z", \
-         "angular_velocity_x, angular_velocity_y, angular_velocity_z"]
+FREQUENCY = 1000
+DELTA_T = 1 / FREQUENCY
+HEADER = ["velocity_x(m/s), velocity_y(m/s), velocity_z(m/s)", "location_x, location_y, location_z", \
+         "pitch, yaw, roll", "acceleration_x(m/s^2), acceleration_y(m/s^2), acceleration_z(m/s^2)", \
+         "angular_velocity_x(deg/s), angular_velocity_y(deg/s), angular_velocity_z(deg/s)"]
 
 
 # Connect to the client and retrieve the world object
@@ -46,9 +47,11 @@ blueprint_library = world.get_blueprint_library()
 
 # good spawn point for Town06
 ego_vehicle_spawn_point = Transform(Location(x=-272, y=-18, z=0.281494), \
-                                          Rotation(pitch=0.000000, yaw=0.0, roll=0.000000))
-ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.tesla.model3'), ego_vehicle_spawn_point)
-# ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.ford.mustang'), ego_vehicle_spawn_point)
+                                    Rotation(pitch=0.000000, yaw=0.0, roll=0.000000))
+ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.tesla.model3'), \
+                                ego_vehicle_spawn_point)
+# ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.ford.mustang'), \
+#                                 ego_vehicle_spawn_point)
 
 
 # sets the camera to focus on ego_vehicle
@@ -100,9 +103,9 @@ def get_vehicle_acceleration_info(vehicle:Actor) -> str:
 
 def get_angular_velocity_info(vehicle:Actor) -> str:
     vehicle_angular_velocity = vehicle.get_angular_velocity()
-    data = str(vehicle_acceleration.x) + "," \
-         + str(vehicle_acceleration.y) + "," \
-         + str(vehicle_acceleration.z)\
+    data = str(vehicle_angular_velocity.x) + "," \
+         + str(vehicle_angular_velocity.y) + "," \
+         + str(vehicle_angular_velocity.z)\
 #     if(vehicle_angular_velocity == None):
 #         print("angular_velocity_not_available")
     return data
@@ -112,7 +115,7 @@ def create_file_name(ego_vehicle_throttle:float, ego_vehicle_steer:float) -> str
     today = date.today()
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    file_name = ABSOLUTE_PATH + "raw_data_throttle=" + str(ego_vehicle_throttle) + "_steer=" \
+    file_name = "raw_data_throttle=" + str(ego_vehicle_throttle) + "_steer=" \
               + str(ego_vehicle_steer) + "_" + str(today) + "_" + str(current_time) +".csv"
     return file_name
 
@@ -130,14 +133,15 @@ REC_FUNC = [get_vehicle_velocity_info, get_vehicle_location_info, get_vehicle_ro
 def loop(throttle:float, steer:float, ego_vehicle:Actor, spectator:Actor, \
          file_name:str, rec_choice:list) -> None:
     # initialization
+    start_time_in_real_world = datetime.utcnow()
     pre_ego_vehicle_velocity = Vector3D(0.0, 0.0, 0.0)
     frame_zero = world.get_snapshot().frame
     at_const_speed = False
     elapsed_seconds = 0.0
 #     while True:
 #     while elapsed_seconds <= 100:
-    while (not at_const_speed):
-#     while (elapsed_seconds <= 100) & (not at_const_speed):
+#     while (not at_const_speed):
+    while (elapsed_seconds <= 60) | (not at_const_speed):
         setSpectator(ego_vehicle, spectator)
         
         ego_vehicle_throttle = throttle
@@ -150,12 +154,7 @@ def loop(throttle:float, steer:float, ego_vehicle:Actor, spectator:Actor, \
         elapsed_seconds = snapshot.elapsed_seconds
         delta_seconds = snapshot.delta_seconds
         platform_timestamp = snapshot.platform_timestamp
-        data = str(frame) + "," + str(elapsed_seconds) + "," + \
-               str(delta_seconds) + "," + str(platform_timestamp)
-        for i in range(4):
-            if rec_choice[i]:
-                data += ", " + REC_FUNC[i](ego_vehicle)
-        data += "\n"
+        
 #         print(elapsed_seconds)
         ego_vehicle_velocity = ego_vehicle.get_velocity()
         at_const_speed = is_at_const_speed(ego_vehicle_velocity, pre_ego_vehicle_velocity) \
@@ -165,8 +164,15 @@ def loop(throttle:float, steer:float, ego_vehicle:Actor, spectator:Actor, \
                                   ego_vehicle_velocity.y - pre_ego_vehicle_velocity.y,
                                   ego_vehicle_velocity.z - pre_ego_vehicle_velocity.z)
         pre_ego_vehicle_velocity = ego_vehicle_velocity
-        write_to_file("/home/carla/CarlaTable/log/" + "debug_log_" + file_name[31:], str(delta_velocity)+"\n")
-        write_to_file(file_name, data)
+        write_to_file(DEBUG_LOG_PATH + "debug_log_" + file_name, str(delta_velocity)+"\n")
+        data = str(frame) + "," + str((datetime.utcnow() - start_time_in_real_world).total_seconds()) + "," + str(elapsed_seconds) + "," + \
+               str(delta_seconds) + "," + str(platform_timestamp)
+        for i in range(5):
+            if rec_choice[i]:
+                data += ", " + REC_FUNC[i](ego_vehicle)
+        data += "\n"
+        write_to_file(ABSOLUTE_PATH+file_name, data)
+        
         world.tick()
     return None
 
@@ -177,20 +183,76 @@ def run_once(ego_vehicle:Actor, throttle:float, steer:float, \
                           {"rec_rotation":True}, {"rec_acceleration":True}, \
                           {"rec_angular_velocity":True}]) -> None:
     ego_vehicle.show_debug_telemetry(True)
-    data = "frame, elapsed_seconds, delta_seconds, platform_timestamp"
-    for i in range(4):
+    data = "frame, real_world_time_stamp, elapsed_seconds, delta_seconds, platform_timestamp"
+    for i in range(5):
         if rec_choice[i]:
             data += ", "
             data += HEADER[i]
     data += "\n"
     spectator = world.get_spectator()
     file_name = create_file_name(throttle, steer)
-    write_to_file(file_name, data)
+    write_to_file(ABSOLUTE_PATH+file_name, data)
     loop(throttle, steer, ego_vehicle, spectator, file_name, rec_choice)
     return None
 
     
 rec_choice = [1, 1, 0, 1, 1]
-throttle = 0.25
+throttle = 0.99
 steer = 0.0
 run_once(ego_vehicle, throttle, steer, rec_choice)
+
+
+
+# https://softhints.com/increase-cell-width-jupyter-notebook/
+
+# from IPython.display import display, HTML
+# display(HTML("<style>.container { width:100% !important; }</style>"))
+
+
+# import psutil
+# import subprocess
+# import sys
+# import time
+
+#     def poll_gpus(self, flatten=False):
+#         """
+#         Query GPU utilisation, and sanitise results
+
+#         Returns
+#         -------
+#         list of lists of utilisation stats
+#             For each GPU (outer list), there is a list of utilisations
+#             corresponding to each query (inner list), as a string.
+#         """
+#         res = subprocess.check_output(
+#             ['nvidia-smi',
+#              '--query-gpu=' + self.gpu_query,
+#              '--format=csv,nounits,noheader']
+#             )
+#         lines = [i_res for i_res in res.decode().split('\n') if i_res != '']
+#         data = [[val.strip() if 'Not Supported' not in val else 'N/A'
+#                  for val in line.split(',')
+#                  ] for line in lines]
+#         if flatten:
+#             data = [y for row in data for y in row]
+#         return data
+
+
+#     def poll_cpu(self):
+#         """
+#         Fetch current CPU, RAM and Swap utilisation
+
+#         Returns
+#         -------
+#         float
+#             CPU utilisation (percentage)
+#         float
+#             RAM utilisation (percentage)
+#         float
+#             Swap utilisation (percentage)
+#         """
+#         return (
+#             psutil.cpu_percent(),
+#             psutil.virtual_memory().percent,
+#             psutil.swap_memory().percent,
+#             )
