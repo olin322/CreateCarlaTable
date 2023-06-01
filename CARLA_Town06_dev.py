@@ -57,13 +57,14 @@ def setSpectator(ego_vehicle:Actor, spectator:Actor) -> None:
     spectator.set_transform(carla.Transform(spectator_transform.location + \
                             carla.Location(x=0, y=0,z=30), carla.Rotation(pitch=-90)))
 
-    !!!!!!!!!!!!!!!!!!
+#     !!!!!!!!!!!!!!!!!!
 # return True if ego vehicle is moving at constant velocity
-def is_at_const_speed(ego_vehicle:Actor, pre_ego_vehicle_velocity:Vector3D) -> bool:
-    ego_vehicle_velocity = ego_vehicle.get_velocity()
-    return ((abs(ego_vehicle_velocity.x - pre_ego_vehicle_velocity.x) <= DELTA_V_CAP) & \
-            (abs(ego_vehicle_velocity.y - pre_ego_vehicle_velocity.y) <= DELTA_V_CAP) & \
-            (abs(ego_vehicle_velocity.z - pre_ego_vehicle_velocity.z) <= DELTA_V_CAP))
+def is_at_const_speed(ego_vehicle_velocity:Vector3D, pre_ego_vehicle_velocity:Vector3D) -> bool:
+#     ego_vehicle_velocity = ego_vehicle.get_velocity()
+    print(abs(ego_vehicle_velocity.x - pre_ego_vehicle_velocity.x))
+    return ((abs(ego_vehicle_velocity.x - pre_ego_vehicle_velocity.x) < DELTA_V_CAP) & \
+            (abs(ego_vehicle_velocity.y - pre_ego_vehicle_velocity.y) < DELTA_V_CAP) & \
+            (abs(ego_vehicle_velocity.z - pre_ego_vehicle_velocity.z) < DELTA_V_CAP))
 
 
 # helper function, collects data to be recorded
@@ -101,7 +102,9 @@ def get_angular_velocity_info(vehicle:Actor) -> str:
     vehicle_angular_velocity = vehicle.get_angular_velocity()
     data = str(vehicle_acceleration.x) + "," \
          + str(vehicle_acceleration.y) + "," \
-         + str(vehicle_acceleration.z)
+         + str(vehicle_acceleration.z)\
+#     if(vehicle_angular_velocity == None):
+#         print("angular_velocity_not_available")
     return data
 
 # return name of the file that raw data will write to  
@@ -127,19 +130,20 @@ REC_FUNC = [get_vehicle_velocity_info, get_vehicle_location_info, get_vehicle_ro
 def loop(throttle:float, steer:float, ego_vehicle:Actor, spectator:Actor, \
          file_name:str, rec_choice:list) -> None:
     # initialization
-    pre_ego_vehicle_velocity = carla.Vector3D(0.0, 0.0, 0.0)
+    pre_ego_vehicle_velocity = Vector3D(0.0, 0.0, 0.0)
     frame_zero = world.get_snapshot().frame
     at_const_speed = False
     elapsed_seconds = 0.0
-    while True:
+#     while True:
 #     while elapsed_seconds <= 100:
-#     while not at_const_speed:
+    while (not at_const_speed):
 #     while (elapsed_seconds <= 100) & (not at_const_speed):
         setSpectator(ego_vehicle, spectator)
         
         ego_vehicle_throttle = throttle
         ego_vehicle_steer = steer
-        ego_vehicle.apply_control(carla.VehicleControl(throttle=ego_vehicle_throttle, steer=ego_vehicle_steer))
+        ego_vehicle.apply_control(carla.VehicleControl(\
+                        throttle=ego_vehicle_throttle, steer=ego_vehicle_steer))
         
         snapshot = world.get_snapshot()
         frame = snapshot.frame - frame_zero
@@ -152,8 +156,16 @@ def loop(throttle:float, steer:float, ego_vehicle:Actor, spectator:Actor, \
             if rec_choice[i]:
                 data += ", " + REC_FUNC[i](ego_vehicle)
         data += "\n"
-        print(elapsed_seconds)
-        at_const_speed = is_at_const_speed(ego_vehicle, pre_ego_vehicle_velocity)
+#         print(elapsed_seconds)
+        ego_vehicle_velocity = ego_vehicle.get_velocity()
+        at_const_speed = is_at_const_speed(ego_vehicle_velocity, pre_ego_vehicle_velocity) \
+                         & (elapsed_seconds >= 5)
+#         print(at_const_speed)
+        delta_velocity = Vector3D(ego_vehicle_velocity.x - pre_ego_vehicle_velocity.x, 
+                                  ego_vehicle_velocity.y - pre_ego_vehicle_velocity.y,
+                                  ego_vehicle_velocity.z - pre_ego_vehicle_velocity.z)
+        pre_ego_vehicle_velocity = ego_vehicle_velocity
+        write_to_file("/home/carla/CarlaTable/log/" + "debug_log_" + file_name[31:], str(delta_velocity)+"\n")
         write_to_file(file_name, data)
         world.tick()
     return None
@@ -164,7 +176,7 @@ def run_once(ego_vehicle:Actor, throttle:float, steer:float, \
             rec_choice = [{"rec_velocity":True}, {"rec_location":True}, \
                           {"rec_rotation":True}, {"rec_acceleration":True}, \
                           {"rec_angular_velocity":True}]) -> None:
-    
+    ego_vehicle.show_debug_telemetry(True)
     data = "frame, elapsed_seconds, delta_seconds, platform_timestamp"
     for i in range(4):
         if rec_choice[i]:
@@ -179,6 +191,6 @@ def run_once(ego_vehicle:Actor, throttle:float, steer:float, \
 
     
 rec_choice = [1, 1, 0, 1, 1]
-throttle = 0.20
+throttle = 0.25
 steer = 0.0
 run_once(ego_vehicle, throttle, steer, rec_choice)
