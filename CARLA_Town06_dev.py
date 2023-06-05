@@ -265,3 +265,60 @@ for run in range(0, 1001):
     ego_vehicle = None
 # for i in range():
 #     run_once()
+
+
+
+
+# import psutil
+# import subprocess
+# import sys
+# import time
+
+#     def poll_gpus(self, flatten=False):
+#         """
+#         Query GPU utilisation, and sanitise results
+
+#         Returns
+#         -------
+#         list of lists of utilisation stats
+#             For each GPU (outer list), there is a list of utilisations
+#             corresponding to each query (inner list), as a string.
+#         """
+#         res = subprocess.check_output(
+#             ['nvidia-smi',
+#              '--query-gpu=' + self.gpu_query,
+#              '--format=csv,nounits,noheader']
+#             )
+#         lines = [i_res for i_res in res.decode().split('\n') if i_res != '']
+#         data = [[val.strip() if 'Not Supported' not in val else 'N/A'
+#                  for val in line.split(',')
+#                  ] for line in lines]
+#         if flatten:
+#             data = [y for row in data for y in row]
+#         return data
+
+
+#     def poll_cpu(self):
+#         """
+#         Fetch current CPU, RAM and Swap utilisation
+
+#         Returns
+#         -------
+#         float
+#             CPU utilisation (percentage)
+#         float
+#             RAM utilisation (percentage)
+#         float
+#             Swap utilisation (percentage)
+#         """
+#         return (
+#             psutil.cpu_percent(),
+#             psutil.virtual_memory().percent,
+#             psutil.swap_memory().percent,
+#             )
+
+### TO ADJUST JUPYTER-NOTEBOOK CELL WIDTH
+# https://softhints.com/increase-cell-width-jupyter-notebook/
+
+# from IPython.display import display, HTML
+# display(HTML("<style>.container { width:70% !important; }</style>"))
