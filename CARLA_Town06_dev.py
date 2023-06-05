@@ -16,6 +16,8 @@ ABSOLUTE_PATH = "/home/carla/CarlaTable/tables/"
 DEBUG_LOG_PATH = "/home/carla/CarlaTable/log/"
 DELTA_V_CAP = 1e-5
 FREQUENCY = 100 # HZ
+MIN_SECONDS_EACH_RUN = 2
+MAX_SECONDS_EACH_RUN = 90
 DELTA_T = 1 / FREQUENCY
 HEADER = ["velocity_x(m/s), velocity_y(m/s), velocity_z(m/s)", "location_x, location_y, location_z", \
          "pitch, yaw, roll", "acceleration_x(m/s^2), acceleration_y(m/s^2), acceleration_z(m/s^2)", \
@@ -38,11 +40,11 @@ settings.synchronous_mode = True # Enables synchronous mode
 settings.fixed_delta_seconds = DELTA_T
 world.apply_settings(settings)
 
-# get blueprint
+# get blueprintthrottle = 0.4
 level = world.get_map()
 weather = world.get_weather()
 blueprint_library = world.get_blueprint_library()
-
+elapsed_seconds_since_world_starts = world.get_snapshot().elapsed_seconds
 # Get the blueprint library and filter for the vehicle blueprints
 # vehicle_blueprints = world.get_blueprint_library().filter('*vehicle*')
 
@@ -112,8 +114,14 @@ def create_file_name(ego_vehicle_throttle:float, ego_vehicle_steer:float) -> str
     today = date.today()
     now = datetime.now()
     current_time = now.strftime("%H:%M:%S")
-    file_name = "raw_data_throttle=" + str(ego_vehicle_throttle) + "_steer=" \
-              + str(ego_vehicle_steer) + "_" + str(today) + "_" + str(current_time) +".csv"
+    throttle_name = str(throttle)
+    while(len(throttle_name) < 5): # 0.100
+        throttle_name += '0'
+    steer_name = str(steer)
+    while(len(steer_name) < 4): # 0.10
+        steer_name += '0'
+    file_name = "raw_data_throttle=" + throttle_name + "_steer=" \
+              + steer_name + "_" + str(today) + "_" + str(current_time) +".csv"
     return file_name
 
 
@@ -182,13 +190,15 @@ def loop(throttle:float, steer:float, ego_vehicle:Actor, spectator:Actor, \
     frame_zero = world.get_snapshot().frame
     at_const_speed = False
     elapsed_seconds = 0.0
+    simulation_time_stamp_this_run = world.get_snapshot().elapsed_seconds
     vehicle_at_const_speed_counter = 0
 #     while True:
 #     while elapsed_seconds <= 100:
 #     while (not at_const_speed):
 #     print(vehicle_is_in_road(ego_vehicle, elapsed_seconds))
-    while (elapsed_seconds <= 2) | ((elapsed_seconds <= 20) & \
-            (not at_const_speed) & vehicle_is_in_road(ego_vehicle)):
+    while (elapsed_seconds <= MIN_SECONDS_EACH_RUN) | \
+          ( (elapsed_seconds <= MAX_SECONDS_EACH_RUN) ):
+#            & (not at_const_speed) & vehicle_is_in_road(ego_vehicle) ):
                                     
         setSpectator(ego_vehicle, spectator)
         
@@ -199,7 +209,7 @@ def loop(throttle:float, steer:float, ego_vehicle:Actor, spectator:Actor, \
         
         snapshot = world.get_snapshot()
         frame = snapshot.frame - frame_zero
-        elapsed_seconds = snapshot.elapsed_seconds
+        elapsed_seconds = snapshot.elapsed_seconds - simulation_time_stamp_this_run
         delta_seconds = snapshot.delta_seconds
         platform_timestamp = snapshot.platform_timestamp
         
@@ -245,26 +255,32 @@ def run_once(ego_vehicle:Actor, throttle:float, steer:float, \
     loop(throttle, steer, ego_vehicle, spectator, file_name, rec_choice)
     return None
 
-    
+# choice of data needed
+# 5 parameters corresponds to 
+# velocity, location, rotation, acceleration, angular_velocity
 rec_choice = [1, 1, 1, 1, 1]
 throttle_delta = 0.001
 throttle = 0.0
 steer = 0.0
-for run in range(0, 1001):
+for run in range(397, 501):
     ego_vehicle_spawn_point = Transform(Location(x=-272, y=-18, z=0.281494), \
-                                    Rotation(pitch=0.000000, yaw=0.0, roll=0.000000))
+                                Rotation(pitch=0.000000, yaw=0.0, roll=0.000000))
     ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.tesla.model3'), \
                                 ego_vehicle_spawn_point)
     throttle = round(throttle_delta * run, 3)
     run_once(ego_vehicle, throttle, steer, rec_choice)
-#     destroyed = ego_vehicle.destroy()
-    print(throttle)
-    destroyed = False
-    while not destroyed:
-        destroyed = ego_vehicle.destroy()
-    ego_vehicle = None
-# for i in range():
-#     run_once()
+    destroyed = ego_vehicle.destroy()
+
+
+
+
+# ego_vehicle_spawn_point = Transform(Location(x=-272, y=-18, z=0.281494), \
+#                                 Rotation(pitch=0.000000, yaw=0.0, roll=0.000000))
+# ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.tesla.model3'), \
+#                                 ego_vehicle_spawn_point)
+# throttle = 0.4
+# run_once(ego_vehicle, throttle, steer, rec_choice)
+# destroyed = ego_vehicle.destroy()
 
 
 
