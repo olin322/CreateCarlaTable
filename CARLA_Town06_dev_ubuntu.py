@@ -21,9 +21,9 @@ RELATIVE_PATH = "./output_data/"
 ABSOLUTE_PATH = "/home/carla/CarlaTable/tables/"
 DEBUG_LOG_PATH = "/home/carla/CarlaTable/log/debug_log_"
 DELTA_V_CAP = 1e-5
-FREQUENCY = 100 # HZ
+FREQUENCY = 2000 # HZ
 MIN_SECONDS_EACH_RUN = 2
-MAX_SECONDS_EACH_RUN = 5
+MAX_SECONDS_EACH_RUN = 20
 DELTA_T = 1 / FREQUENCY
 HEADER = ["velocity_x(m/s), velocity_y(m/s), velocity_z(m/s)", "location_x, location_y, location_z", \
          "pitch, yaw, roll", "acceleration_x(m/s^2), acceleration_y(m/s^2), acceleration_z(m/s^2)", \
@@ -200,7 +200,7 @@ REC_FUNC = [get_vehicle_velocity_info, get_vehicle_location_info, get_vehicle_ro
 def vehicle_is_in_road(vehicle: Actor) -> bool:
 #     print("x:"+str((vehicle.get_location().y > -21.6) & (vehicle.get_location().y < -10.5)))
 #     print(vehicle.get_location().y)
-    return ((vehicle.get_location().x > -272.0) & (vehicle.get_location().x < 625.0))
+    return ((vehicle.get_location().x > -272.5) & (vehicle.get_location().x < 625.0))
 #     return ((vehicle.get_location().x > -272.0) & (vehicle.get_location().x < 625.0) & \
 #             (vehicle.get_location().y > -21.5) & (vehicle.get_location().y < -10.5) & \
 #             (vehicle.get_location().z > 0.0) & (vehicle.get_location().z < 0.5)) 
@@ -272,19 +272,16 @@ def loop(throttle: float, steer: float, ego_vehicle: Actor, spectator: Actor, \
         elapsed_seconds = snapshot.elapsed_seconds - simulation_time_stamp_this_run
         delta_seconds = snapshot.delta_seconds
         platform_timestamp = snapshot.platform_timestamp
-        
-#         print(elapsed_seconds)
+
         ego_vehicle_velocity = ego_vehicle.get_velocity()
-        at_const_speed = vehicle_at_const_speed(ego_vehicle_velocity, pre_ego_vehicle_velocity, elapsed_seconds)
-#         print(at_const_speed)
-        delta_velocity = Vector3D(ego_vehicle_velocity.x - pre_ego_vehicle_velocity.x, 
-                                  ego_vehicle_velocity.y - pre_ego_vehicle_velocity.y,
-                                  ego_vehicle_velocity.z - pre_ego_vehicle_velocity.z)
-        pre_ego_vehicle_velocity = ego_vehicle_velocity
+        # at_const_speed = vehicle_at_const_speed(ego_vehicle_velocity, pre_ego_vehicle_velocity, elapsed_seconds)
+
+        # delta_velocity = Vector3D(ego_vehicle_velocity.x - pre_ego_vehicle_velocity.x, 
+        #                           ego_vehicle_velocity.y - pre_ego_vehicle_velocity.y,
+        #                           ego_vehicle_velocity.z - pre_ego_vehicle_velocity.z)
+        # pre_ego_vehicle_velocity = ego_vehicle_velocity
         
-        # write debu0g log
-        
-        log_debug_info(DEBUG_LOG_PATH + file_name, frame, elapsed_seconds)
+        # log_debug_info(DEBUG_LOG_PATH + file_name, frame, elapsed_seconds)
 #         write_to_file(DEBUG_LOG_PATH + file_name, str(delta_velocity)+"\n")
         # write to table
         data = str(frame) + "," + str((datetime.utcnow() - start_time_in_real_world).total_seconds()) \
@@ -305,7 +302,7 @@ def run_once(ego_vehicle: Actor, throttle: float, steer: float, \
             rec_choice = [{"rec_velocity":True}, {"rec_location":True}, \
                           {"rec_rotation":True}, {"rec_acceleration":True}, \
                           {"rec_angular_velocity":True}]) -> None:
-#     ego_vehicle.show_debug_telemetry(True)
+    ego_vehicle.show_debug_telemetry(True)
     data = "frame, real_world_time_stamp, elapsed_seconds, delta_seconds, platform_timestamp"
     for i in range(5):
         if rec_choice[i]:
@@ -314,9 +311,9 @@ def run_once(ego_vehicle: Actor, throttle: float, steer: float, \
     data += "\n"
     spectator = world.get_spectator()
     file_name = create_file_name(throttle, steer)
-    debug_header = "frame number, elapsed_seconds, GPU Usage %, GPU Mem Usage, \
-              GPU Temperature, CPU Usage, System RAM, Swap, delta_velocity\n"
-    write_to_file(DEBUG_LOG_PATH + file_name, debug_header)
+    # debug_header = "frame number, elapsed_seconds, GPU Usage %, GPU Mem Usage, \
+    #           GPU Temperature, CPU Usage, System RAM, Swap, delta_velocity\n"
+    # write_to_file(DEBUG_LOG_PATH + file_name, debug_header)
     write_to_file(ABSOLUTE_PATH + file_name, data)
     loop(throttle, steer, ego_vehicle, spectator, file_name, rec_choice)
     return None
@@ -328,14 +325,17 @@ rec_choice = [1, 1, 1, 1, 1]
 throttle_delta = 0.001
 throttle = 0.0
 steer = 0.0
-# for run in range(397, 501):
-#     ego_vehicle_spawn_point = Transform(Location(x=-272, y=-18, z=0.281494), \
-#                                 Rotation(pitch=0.000000, yaw=0.0, roll=0.000000))
-#     ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.tesla.model3'), \
-#                                 ego_vehicle_spawn_point)
-#     throttle = round(throttle_delta * run, 3)
-#     run_once(ego_vehicle, throttle, steer, rec_choice)
-#     destroyed = ego_vehicle.destroy()
+for run in range(131, 151):
+    ego_vehicle_spawn_point = Transform(Location(x=-272, y=-18, z=0.051494), \
+                                Rotation(pitch=0.000000, yaw=0.0, roll=0.000000))
+    ego_vehicle = world.spawn_actor(blueprint_library.find('vehicle.lincoln.mkz_2020'), \
+                                ego_vehicle_spawn_point)
+    throttle = round(throttle_delta * run, 3)
+    print("current run throttle = ", throttle)
+    run_once(ego_vehicle, throttle, steer, rec_choice)
+    destroyed = ego_vehicle.destroy()
+
+
 
 
 ###
